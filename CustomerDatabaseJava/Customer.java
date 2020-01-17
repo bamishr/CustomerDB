@@ -87,5 +87,16 @@ public class Customer {
 	public void setAddress(String address) {
 		this.address = address;
 	}
+	public void setLastName(String lastname) {
+		this.lastname = lastname;
+	}
+
+	public String getAddress() {
+		return address;
+	}
+
+	public void setAddress(String address) {
+		this.address = address;
+	}
 
 }
