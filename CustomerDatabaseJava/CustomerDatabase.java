@@ -19,6 +19,10 @@ public abstract class CustomerDatabase {
 		customers.add(new Customer("Elana", "Ericson", "2 The Street, The Town"));
 		customers.add(new Customer("Lyle", "Longino", "3 The Street, The Town"));
 		customers.add(new Customer("Gerri", "Gaertner", "4 The Street, The Town"));
+		customers.add(new Customer("Denis", "Darner", "1 The Street, The Town"));
+		customers.add(new Customer("Elana", "Ericson", "2 The Street, The Town"));
+		customers.add(new Customer("Lyle", "Longino", "3 The Street, The Town"));
+		customers.add(new Customer("Gerri", "Gaertner", "4 The Street, The Town"));
 		customers.add(new Customer("Willis", "Wicks", "5 The Street, The Town"));
 		customers.add(new Customer("Jessika", "Jeon", "6 The Street, The Town"));
 		customers.add(new Customer("Neil", "Newton", "7 The Street, The Town"));
