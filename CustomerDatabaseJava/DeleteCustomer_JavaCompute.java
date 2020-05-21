@@ -97,6 +97,12 @@ public class DeleteCustomer_JavaCompute extends MbJavaComputeNode {
 				outLocalEnvironment.getRootElement().evaluateXPath("?Destination/?HTTP/?ReplyStatusCode[set-value($statuscode)]", vars);
 				outMessage.getRootElement().createElementAsLastChild("JSON");
 				outMessage.getRootElement().evaluateXPath("?JSON/?Data/?error[set-value($error)]", vars);
+				if (!result) {
+				vars.assign("statuscode", 404);
+				vars.assign("error", "A customer with the specified ID does not exist in the database.");
+				outLocalEnvironment.getRootElement().evaluateXPath("?Destination/?HTTP/?ReplyStatusCode[set-value($statuscode)]", vars);
+				outMessage.getRootElement().createElementAsLastChild("JSON");
+				outMessage.getRootElement().evaluateXPath("?JSON/?Data/?error[set-value($error)]", vars);
 			} else {
 				vars.assign("message", "The customer with the specified ID was successfully deleted from the database.");
 				outMessage.getRootElement().createElementAsLastChild("JSON");
