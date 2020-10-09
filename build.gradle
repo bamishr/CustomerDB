@@ -1,0 +1,141 @@
+//build.gradle
+
+def iibEnv, appName, barfileDir, version, integrationNodes, cbParams, soapUIProject, soapUIParams, soapuiExec, overrideFile, orParams, barfileName
+
+task loadConfiguration {
+
+  description 'Loads IIB Project Build Configuration from build.config file and sets Ant properties.'
+
+  def config = new ConfigSlurper().parse(file('build.config').toURL())
+  ant.echo("Build configuration file loaded ...")
+
+  config.each { k,v  ->
+
+    appName = k
+    iibEnv = v.iibEnv
+    barfileDir = v.barfileDir
+    version = v.versionMajor + "." + v.versionMinor
+
+    barfileName = "${projectDir}/${barfileDir}/${appName}-${version}.bar"
+
+    cbParams = "-cleanBuild -data ${projectDir} -b ${barfileName} -a "
+
+    //Mandatory. There must at least be one application
+
+    v.applications.each { app -> cbParams += "$app "}
+
+    if (!v.libraries.isEmpty()) {
+
+      cbParams += " -l "
+      v.libraries.each {lib -> cbParams += "$lib "}
+    }
+    if (!v.projects.isEmpty()) {
+
+      cbParams += " -p "
+      v.projects.each { proj -> cbParams += "$proj "}
+    }
+    if (v.deployAsSource) { cbParams += " -deployAsSource"}
+
+    soapUIProject = v.soapUIProject
+    soapUIParams = v.soapUIParams
+    integrationNodes = v.integrationNodes
+
+    /* Select appropriate override properties file based on target deployment environment */
+
+    switch (iibEnv) {
+
+             case "PROD":
+              overrideFile = 'override-prod.properties'
+              break;
+             case "QA":
+              overrideFile = 'override-qa.properties'
+              break;
+             default:
+             overrideFile = 'override.properties'
+    }
+    orParams = "-b ${barfileName} -p ${overrideFile} -r"
+  }
+
+  // Set Ant properties based on underlying platform
+
+    if (org.gradle.internal.os.OperatingSystem.current().windows) {
+
+        ant.properties['mqsi.deployw'] = 'mqsideployw.bat'
+        ant.properties['mqsi.deployw.param'] = '/C'
+        ant.properties['mqsi.createbar'] = 'mqsicreatebar.exe'
+        ant.properties['iib.path'] = mqsiprofilePathWin
+        ant.properties['cmd.exec'] = 'cmd.exe'
+
+        soapuiExec = soapUIPathWin + '\\testrunner.bat'
+
+      } else if (org.gradle.internal.os.OperatingSystem.current().macOsX) {
+
+        ant.properties['mqsi.deployw'] = 'mqsideployw'
+        ant.properties['mqsi.deployw.param'] = ''
+        ant.properties['mqsi.createbar'] = 'mqsicreatebar'
+        ant.properties['iib.path'] = mqsiprofilePathMacOS
+        ant.properties['cmd.exec'] = projectDir.getPath() + '/mqsideployw'
+
+        soapuiExec = soapUIPathMacOS + '/testrunner.sh'
+
+      } else {
+
+        ant.properties['mqsi.deployw'] = 'mqsideployw'
+        ant.properties['mqsi.deployw.param'] = ''
+        ant.properties['mqsi.createbar'] = 'mqsicreatebar'
+        ant.properties['iib.path'] = mqsiprofilePathUnix
+        ant.properties['cmd.exec'] = projectDir.getPath() + '/mqsideployw'
+
+        soapuiExec = soapUIPathUnix + '/testrunner.sh'
+      }
+
+      ant.properties['mqsi.applybaroverride'] = "com.ibm.broker.config.util.ApplyBarOverride"
+      ant.properties['override.file'] = "${projectDir}/${overrideFile}"
+      ant.properties['mqsi.applybaroverride.parameters'] = orParams
+      ant.properties['workspace.dir'] = projectDir
+      ant.properties['barfile.dir'] = barfileDir
+      ant.properties['iib.bar.version'] = version
+      ant.properties['iib.bar'] = appName
+      ant.properties['mqsi.createbar.parameters'] = cbParams
+      ant.properties['iib.barfile.param'] = barfileName
+    }
+
+    /* Imports Ant build.xml script */
+
+    ant.importBuild 'build.xml'
+
+    task runSoapUI {
+
+        description "Runs a SoapUI Test Project and generates a junit-style test report."
+
+      doLast {
+
+        if (soapUIProject != 'None') {
+
+          def soapuiParameters = soapUIParams + ' ' + soapUIProject
+          ant.mruntest(soapuiexec: soapuiExec, params: soapuiParameters)
+
+          } else {
+            ant.echo('Nothing to do ...')
+          }
+        }
+      }
+
+      task multiDeploy() {
+
+          description "Invokes the mdeploy Ant macro to prepare the MQSI environment and deploy the compiled BAR file to one or more IIB integration nodes."
+
+        doLast {
+
+          integrationNodes.each {name, value ->
+
+            ant.mdeploy(inode: value.intNode,
+                        hostname: value.host,
+                        port: value.port,
+                        execgroup: value.intServer)
+          }
+        }
+      }
+
+      multiDeploy.dependsOn('override')
+      runSoapUI.dependsOn('multiDeploy')

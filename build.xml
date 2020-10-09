@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="iib.build" basedir=".">
+
+	<!--Set property deploy.only if an existing BAR file is up to date -->
+
+	<uptodate property="deploy.only" targetfile="${iib.barfile.param}">
+		<srcfiles dir="${basedir}" includes="**/*.msgflow" />
+		<srcfiles dir="${basedir}" includes="**/*.subflow" />
+		<srcfiles dir="${basedir}" includes="**/*.java" />
+		<srcfiles dir="${basedir}" includes="**/*.esql" />
+		<srcfiles dir="${basedir}" includes="**/*.xml" />
+		<srcfiles dir="${basedir}" includes="**/*.xsd" />
+		<srcfiles dir="${basedir}" includes="**/*.wsdl" />
+		<srcfiles dir="${basedir}" includes="**/*.json" />
+		<srcfiles dir="${basedir}" includes="**/*.map" />
+	</uptodate>
+
+	<!-- Create build start time stamp -->
+
+	<tstamp>
+		<format property="time.stamp" pattern="yyyy-MM-dd'T'HH:mm:ss" />
+	</tstamp>
+
+	<!-- End of Global Properties -->
+
+	<echo message="Build start time: ${time.stamp}" />
+
+	<target name="cleanup" description="Deletes compiled bar file for this specific application or project." unless="${deploy.only}">
+		<echo message="CLEANUP target is starting ...${line.separator}" />
+		<delete failonerror="false" verbose="true">
+			<fileset dir="${barfile.dir}" includes="**/${iib.bar}*.bar" />
+			<fileset dir="${basedir}" includes="*.log" />
+			<fileset dir="${basedir}" includes="TEST*.xml" />
+			<fileset dir="${basedir}" includes="**/*.class" />
+		</delete>
+	</target>
+
+	<target name="compile" depends="cleanup" description="Creates a new BAR file using the mqsicreatebar command." unless="${deploy.only}">
+		<echo message="COMPILE target starting ...${line.separator}" />
+		<echo message="Command line: ${mqsi.createbar} ${mqsi.createbar.parameters}${line.separator}" />
+		<exec executable="${iib.path}${file.separator}tools${file.separator}${mqsi.createbar}" failonerror="true">
+			<arg line="${mqsi.createbar.parameters}" />
+		</exec>
+	</target>
+
+	<target name="override" depends="compile" description="Overrides properties of the built BAR file using the mqsiapplybaroverride command.
+		The new property values are read from an overrides file." unless="${deploy.only}">
+		<echo message="OVERRIDE target starting ...${line.separator}" />
+		<echo message="Command line: java -cp ... ${mqsi.applybaroverride}  ${mqsi.applybaroverride.parameters}${line.separator}" />
+
+		<java classname="${mqsi.applybaroverride}" failonerror="true" fork="true">
+  		<arg line="${mqsi.applybaroverride.parameters} -runtime" />
+  		<classpath>
+   			<fileset dir="${iib.path}${file.separator}server${file.separator}classes">
+    				<include name="*.jar"/>
+   			</fileset>
+			<fileset dir="${iib.path}${file.separator}common${file.separator}classes">
+				<include name="*.jar"/>
+			</fileset>
+  		</classpath>
+ 		</java>
+	</target>
+
+	<macrodef name="mruntest">
+
+		<attribute name="soapuiexec" />
+		<attribute name="params" />
+
+		<sequential>
+			<echo message="RUN.TEST target starting ...${line.separator}" />
+			<echo message="Command line: @{soapuiexec} @{params}${line.separator}" />
+			<exec executable="@{soapuiexec}" failonerror="true">
+				<arg line="@{params}" />
+			</exec>
+		</sequential>
+	</macrodef>
+
+	<macrodef name="mdeploy">
+
+		<attribute name="inode" />
+		<attribute name="hostname" default="localhost"/>
+		<attribute name="port" default="4414" />
+		<attribute name="barfile" default="${iib.barfile.param}" />
+		<attribute name="execgroup" default="default"/>
+
+		<sequential>
+			<echo message="MULTI.DEPLOY target starting ...${line.separator}" />
+			<echo message="Preparing the MQSI environment ..." />
+			<echo message="Command line: ${cmd.exec} ${mqsi.deployw.param} ${basedir}${file.separator}${mqsi.deployw} ${iib.path}${file.separator}server${file.separator}bin @{inode} @{hostname} @{port} @{barfile} @{execgroup}" />
+			<exec executable="${cmd.exec}" failonerror="true">
+		  	<arg line="${mqsi.deployw.param} ${basedir}${file.separator}${mqsi.deployw} '${iib.path}${file.separator}server${file.separator}bin' @{inode} @{hostname} @{port} @{barfile} @{execgroup}"/>
+			</exec>
+		</sequential>
+	</macrodef>
+
+	<target name="testHTTP" depends="multiDeploy" description="Exercises the HTTP Input Nodes">
+	<echo message="TEST target starting ..." />
+	<java classname="demo.iib.ci.TestClient">
+	  <classpath>
+	    <pathelement location="${workspace.dir}${file.separator}TestClient${file.separator}bin" />
+	  </classpath>
+	</java>
+	</target>
+
+	<!-- TODO. The deployed BAR file to be copied to an object store -->
+
+</project>
